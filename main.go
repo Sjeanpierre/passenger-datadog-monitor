@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"sort"
 	"time"
+    "log"
 )
 
 type passengerStatus struct {
@@ -65,6 +66,17 @@ func retrievePassengerStats() (io.Reader, error) {
 	return bytes.NewReader(out), nil
 }
 
+func parsePassengerXML(xmlData *io.Reader) (passengerStatus, error){
+    var ParsedPassengerXML passengerStatus
+    dec := xml.NewDecoder(*xmlData)
+    dec.CharsetReader = charset.NewReader
+    err := dec.Decode(&ParsedPassengerXML)
+    if err != nil {
+        return passengerStatus{}, err
+    }
+    return ParsedPassengerXML, nil
+}
+
 func chartProcessed(passengerDetails *passengerStatus) {
 	fmt.Println("|=====Processed====|")
 	var processed []int
@@ -94,10 +106,12 @@ func chartMemory(passengerDetails *passengerStatus) {
 }
 
 func chartPendingRequest(passengerDetails *passengerStatus) {
+    fmt.Println("|=====Queue Depth====|")
 	fmt.Println("Queue Depth", passengerDetails.QueuedCount)
 }
 
 func chartPoolUse(passengerDetails *passengerStatus) {
+    fmt.Println("|=====Pool Usage====|")
 	fmt.Println("Used Pool", passengerDetails.ProcessCount)
 	fmt.Println("Max Pool", passengerDetails.PoolMax)
 }
@@ -120,19 +134,15 @@ func chartProcessUptime(passengerDetails *passengerStatus) {
 func main() {
 	xmlData, err := retrievePassengerStats()
 	if err != nil {
-		fmt.Println("Error getting passenger data:", err)
-		return
+		log.Fatal("Error getting passenger data:", err)
 	}
-	var StatusInfo passengerStatus
-	dec := xml.NewDecoder(xmlData)
-	dec.CharsetReader = charset.NewReader
-	err = dec.Decode(&StatusInfo)
-	if err != nil {
-		fmt.Println(err)
-	}
-	chartProcessed(&StatusInfo)
-	chartMemory(&StatusInfo)
-	chartPendingRequest(&StatusInfo)
-	chartPoolUse(&StatusInfo)
-	chartProcessUptime(&StatusInfo)
+	PassengerStatusData, err := parsePassengerXML(&xmlData)
+    if err != nil {
+        log.Fatal("Error parsing passenger data:", err)
+    }
+	chartProcessed(&PassengerStatusData)
+	chartMemory(&PassengerStatusData)
+	chartPendingRequest(&PassengerStatusData)
+	chartPoolUse(&PassengerStatusData)
+	chartProcessUptime(&PassengerStatusData)
 }
