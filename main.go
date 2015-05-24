@@ -6,13 +6,16 @@ import (
 	_ "code.google.com/p/go-charset/data"
 	"encoding/xml"
 	"fmt"
+	"github.com/PagerDuty/godspeed"
 	"io"
-	_ "os"
+	"log"
+	"os"
 	"os/exec"
 	"sort"
 	"time"
-    "log"
 )
+
+var print bool
 
 type passengerStatus struct {
 	XMLName      xml.Name  `xml:"info"`
@@ -31,7 +34,8 @@ type process struct {
 	Memory          int `xml:"real_memory"`
 }
 
-type stats struct {
+//Stats is used to store stats
+type Stats struct {
 	min int
 	len int
 	avg int
@@ -39,8 +43,8 @@ type stats struct {
 	sum int
 }
 
-func summerizeStats(statsArray *[]int) stats {
-	var processedStats stats
+func summerizeStats(statsArray *[]int) Stats {
+	var processedStats Stats
 	sum, count := 0, len(*statsArray)
 	sort.Sort(sort.IntSlice(*statsArray))
 
@@ -65,59 +69,39 @@ func retrievePassengerStats() (io.Reader, error) {
 	}
 	return bytes.NewReader(out), nil
 }
-
-func parsePassengerXML(xmlData *io.Reader) (passengerStatus, error){
-    var ParsedPassengerXML passengerStatus
-    dec := xml.NewDecoder(*xmlData)
-    dec.CharsetReader = charset.NewReader
-    err := dec.Decode(&ParsedPassengerXML)
-    if err != nil {
-        return passengerStatus{}, err
-    }
-    return ParsedPassengerXML, nil
+func parsePassengerXML(xmlData *io.Reader) (passengerStatus, error) {
+	var ParsedPassengerXML passengerStatus
+	dec := xml.NewDecoder(*xmlData)
+	dec.CharsetReader = charset.NewReader
+	err := dec.Decode(&ParsedPassengerXML)
+	if err != nil {
+		return passengerStatus{}, err
+	}
+	return ParsedPassengerXML, nil
 }
 
-func chartProcessed(passengerDetails *passengerStatus) {
-	fmt.Println("|=====Processed====|")
+func floatMyInt(value int) float64{
+    return float64(value)
+}
+
+func processed(passengerDetails *passengerStatus) Stats {
 	var processed []int
 	processes := passengerDetails.Processes
 	for _, processStats := range processes {
 		processed = append(processed, processStats.Processed)
 	}
-	stats := summerizeStats(&processed)
-	fmt.Println("Total processed", stats.sum)   //sum processed by threads
-	fmt.Println("Average processed", stats.avg) //average processed by threads
-	fmt.Println("Minimum processed", stats.min)
-	fmt.Println("Maximum processed", stats.max)
+	return summerizeStats(&processed)
 }
-
-func chartMemory(passengerDetails *passengerStatus) {
-	fmt.Println("|=====Memory====|")
+func memory(passengerDetails *passengerStatus) Stats {
 	var memory []int
 	processes := passengerDetails.Processes
 	for _, processStats := range processes {
 		memory = append(memory, processStats.Memory)
 	}
-	stats := summerizeStats(&memory)
-	fmt.Println("Total memory", stats.sum/1024)   //sum processed by threads
-	fmt.Println("Average memory", stats.avg/1024) //average processed by threads
-	fmt.Println("Minimum memory", stats.min/1024)
-	fmt.Println("Maximum memory", stats.max/1024)
+	return summerizeStats(&memory)
 }
+func processUptime(passengerDetails *passengerStatus) Stats {
 
-func chartPendingRequest(passengerDetails *passengerStatus) {
-    fmt.Println("|=====Queue Depth====|")
-	fmt.Println("Queue Depth", passengerDetails.QueuedCount)
-}
-
-func chartPoolUse(passengerDetails *passengerStatus) {
-    fmt.Println("|=====Pool Usage====|")
-	fmt.Println("Used Pool", passengerDetails.ProcessCount)
-	fmt.Println("Max Pool", passengerDetails.PoolMax)
-}
-
-func chartProcessUptime(passengerDetails *passengerStatus) {
-	fmt.Println("|=====Process uptime====|")
 	var upTimes []int
 	processes := passengerDetails.Processes
 	for _, processStats := range processes {
@@ -125,24 +109,90 @@ func chartProcessUptime(passengerDetails *passengerStatus) {
 		uptime := time.Since(SpawnedNano)
 		upTimes = append(upTimes, int(uptime.Minutes()))
 	}
-	stats := summerizeStats(&upTimes)
-	fmt.Println("Average uptime", stats.avg, "min")
-	fmt.Println("Minimum uptime", stats.min, "min")
-	fmt.Println("Maximum uptime", stats.max, "min")
+	return summerizeStats(&upTimes)
+}
+
+func chartPendingRequest(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
+	if print {
+		fmt.Println("|=====Queue Depth====|")
+		fmt.Println("Queue Depth", passengerDetails.QueuedCount)
+	}
+    DogStatsD.Gauge("passenger.queue.depth", floatMyInt(passengerDetails.QueuedCount),nil)
+}
+func chartPoolUse(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
+	if print {
+		fmt.Println("|=====Pool Usage====|")
+		fmt.Println("Used Pool", passengerDetails.ProcessCount)
+		fmt.Println("Max Pool", passengerDetails.PoolMax)
+	}
+        DogStatsD.Gauge("passenger.pool.used", floatMyInt(passengerDetails.ProcessCount),nil)
+        DogStatsD.Gauge("passenger.pool.max", floatMyInt(passengerDetails.PoolMax),nil)
+}
+func chartProcessed(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
+	stats := processed(passengerDetails)
+	if print {
+		fmt.Println("|=====Processed====|")
+		fmt.Println("Total processed", stats.sum)   //sum processed by threads
+		fmt.Println("Average processed", stats.avg) //average processed by threads
+		fmt.Println("Minimum processed", stats.min)
+		fmt.Println("Maximum processed", stats.max)
+	}
+    DogStatsD.Gauge("passenger.processed.total",floatMyInt(stats.sum),nil)
+    DogStatsD.Gauge("passenger.processed.avg",floatMyInt(stats.avg),nil)
+    DogStatsD.Gauge("passenger.processed.min",floatMyInt(stats.min),nil)
+    DogStatsD.Gauge("passenger.processed.max",floatMyInt(stats.max),nil)
+
+}
+func chartMemory(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
+	stats := memory(passengerDetails)
+	if print {
+		fmt.Println("|=====Memory====|")
+		fmt.Println("Total memory", stats.sum/1024)
+		fmt.Println("Average memory", stats.avg/1024)
+		fmt.Println("Minimum memory", stats.min/1024)
+		fmt.Println("Maximum memory", stats.max/1024)
+	}
+    DogStatsD.Gauge("passenger.memory.total",floatMyInt(stats.sum/1024),nil)
+    DogStatsD.Gauge("passenger.memory.avg",floatMyInt(stats.avg/1024),nil)
+    DogStatsD.Gauge("passenger.memory.min",floatMyInt(stats.min/1024),nil)
+    DogStatsD.Gauge("passenger.memory.max",floatMyInt(stats.max/1024),nil)
+}
+func chartProcessUptime(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
+	stats := processUptime(passengerDetails)
+	if print {
+		fmt.Println("|=====Process uptime====|")
+		fmt.Println("Average uptime", stats.avg, "min")
+		fmt.Println("Minimum uptime", stats.min, "min")
+		fmt.Println("Maximum uptime", stats.max, "min")
+	}
+    DogStatsD.Gauge("passenger.uptime.avg",floatMyInt(stats.avg),nil)
+    DogStatsD.Gauge("passenger.uptime.min",floatMyInt(stats.min),nil)
+    DogStatsD.Gauge("passenger.uptime.max",floatMyInt(stats.max),nil)
 }
 
 func main() {
+	if len(os.Args[1:]) > 0 {
+		if os.Args[1] == "print" {
+			print = true
+		}
+	}
 	xmlData, err := retrievePassengerStats()
 	if err != nil {
 		log.Fatal("Error getting passenger data:", err)
 	}
 	PassengerStatusData, err := parsePassengerXML(&xmlData)
-    if err != nil {
-        log.Fatal("Error parsing passenger data:", err)
-    }
-	chartProcessed(&PassengerStatusData)
-	chartMemory(&PassengerStatusData)
-	chartPendingRequest(&PassengerStatusData)
-	chartPoolUse(&PassengerStatusData)
-	chartProcessUptime(&PassengerStatusData)
+	if err != nil {
+		log.Fatal("Error parsing passenger data:", err)
+	}
+	DogStatsD, err := godspeed.NewDefault()
+	if err != nil {
+		log.Fatal("Error establishing StatsD connection", err)
+	}
+	defer DogStatsD.Conn.Close()
+
+	chartProcessed(&PassengerStatusData, DogStatsD)
+	chartMemory(&PassengerStatusData, DogStatsD)
+	chartPendingRequest(&PassengerStatusData, DogStatsD)
+	chartPoolUse(&PassengerStatusData, DogStatsD)
+	chartProcessUptime(&PassengerStatusData, DogStatsD)
 }
