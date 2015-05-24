@@ -176,23 +176,26 @@ func main() {
 			print = true
 		}
 	}
-	xmlData, err := retrievePassengerStats()
-	if err != nil {
-		log.Fatal("Error getting passenger data:", err)
-	}
-	PassengerStatusData, err := parsePassengerXML(&xmlData)
-	if err != nil {
-		log.Fatal("Error parsing passenger data:", err)
-	}
-	DogStatsD, err := godspeed.NewDefault()
-	if err != nil {
-		log.Fatal("Error establishing StatsD connection", err)
-	}
-	defer DogStatsD.Conn.Close()
+    for {
+        xmlData, err := retrievePassengerStats()
+        if err != nil {
+            log.Fatal("Error getting passenger data:", err)
+        }
+        PassengerStatusData, err := parsePassengerXML(&xmlData)
+        if err != nil {
+            log.Fatal("Error parsing passenger data:", err)
+        }
+        DogStatsD, err := godspeed.NewDefault()
+        if err != nil {
+            log.Fatal("Error establishing StatsD connection", err)
+        }
+        defer DogStatsD.Conn.Close()
 
-	chartProcessed(&PassengerStatusData, DogStatsD)
-	chartMemory(&PassengerStatusData, DogStatsD)
-	chartPendingRequest(&PassengerStatusData, DogStatsD)
-	chartPoolUse(&PassengerStatusData, DogStatsD)
-	chartProcessUptime(&PassengerStatusData, DogStatsD)
+        chartProcessed(&PassengerStatusData, DogStatsD)
+        chartMemory(&PassengerStatusData, DogStatsD)
+        chartPendingRequest(&PassengerStatusData, DogStatsD)
+        chartPoolUse(&PassengerStatusData, DogStatsD)
+        chartProcessUptime(&PassengerStatusData, DogStatsD)
+        time.Sleep(10 * time.Second)
+    }
 }
