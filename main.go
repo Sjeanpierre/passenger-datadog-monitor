@@ -189,13 +189,12 @@ func main() {
         if err != nil {
             log.Fatal("Error establishing StatsD connection", err)
         }
-        defer DogStatsD.Conn.Close()
-
         chartProcessed(&PassengerStatusData, DogStatsD)
         chartMemory(&PassengerStatusData, DogStatsD)
         chartPendingRequest(&PassengerStatusData, DogStatsD)
         chartPoolUse(&PassengerStatusData, DogStatsD)
         chartProcessUptime(&PassengerStatusData, DogStatsD)
+        DogStatsD.Conn.Close()
         time.Sleep(10 * time.Second)
     }
 }
