@@ -185,6 +185,9 @@ func main() {
         if err != nil {
             log.Fatal("Error parsing passenger data:", err)
         }
+        if PassengerStatusData.ProcessCount == 0 {
+            log.Println("Passenger has not yet started any threads, will try again next loop")
+        } else {
         DogStatsD, err := godspeed.NewDefault()
         if err != nil {
             log.Fatal("Error establishing StatsD connection", err)
@@ -195,6 +198,7 @@ func main() {
         chartPoolUse(&PassengerStatusData, DogStatsD)
         chartProcessUptime(&PassengerStatusData, DogStatsD)
         DogStatsD.Conn.Close()
+        }
         time.Sleep(10 * time.Second)
     }
 }
