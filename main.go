@@ -22,7 +22,7 @@ type passengerStatus struct {
 	ProcessCount int       `xml:"process_count"`
 	PoolMax      int       `xml:"max"`
 	PoolCurrent  int       `xml:"capacity_used"`
-	QueuedCount  int       `xml:"get_wait_list_size"`
+	QueuedCount  []int       `xml:"supergroups>supergroup>group>get_wait_list_size"`
 	Processes    []process `xml:"supergroups>supergroup>group>processes>process"`
 }
 
@@ -33,6 +33,7 @@ type process struct {
 	CPU             int `xml:"cpu"`
 	Memory          int `xml:"real_memory"`
 }
+
 
 //Stats is used to store stats
 type Stats struct {
@@ -113,11 +114,15 @@ func processUptime(passengerDetails *passengerStatus) Stats {
 }
 
 func chartPendingRequest(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
-	if print {
+    var totalQueued int
+    for _,queued := range passengerDetails.QueuedCount {
+        totalQueued += queued
+    }
+    if print {
 		fmt.Println("|=====Queue Depth====|")
-		fmt.Println("Queue Depth", passengerDetails.QueuedCount)
+		fmt.Println("Queue Depth", totalQueued)
 	}
-    DogStatsD.Gauge("passenger.queue.depth", floatMyInt(passengerDetails.QueuedCount),nil)
+    DogStatsD.Gauge("passenger.queue.depth", floatMyInt(totalQueued),nil)
 }
 func chartPoolUse(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
 	if print {
