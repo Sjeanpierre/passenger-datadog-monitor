@@ -1,5 +1,5 @@
 # passenger-datadog-monitor
-Send health metrics from Phusion Passenger to DataDog agent using the StatD interface on the.
+Send health metrics from Phusion Passenger to DataDog using the StatD interface on the server agent.
 
 #### Purpose
 Graph and track Passenger threads and possibly detect misbehaving threads before they become a problem.
@@ -13,7 +13,15 @@ Graph and track Passenger threads and possibly detect misbehaving threads before
 
 
 #### Usage
-I currently use this in a cron task that runs every 10 or so seconds. a loop can also be added to the main function to achieve similar results.
+Runs as a daemon with a 10 second sampling interval. Monit, God, SupervisorD, or any other daemon management tool should be used to manage the process.
+
+Sample Monit config
+
+```
+check process passenger-datadog-monitor with pidfile /var/run/passenger-datadog-monitor.pid
+start program = "/etc/init.d/passenger-datadog-monitor start"
+stop  program = "/etc/init.d/passenger-datadog-monitor stop"
+```
 
 `./passenger-datadog-monitor` as root, since access to passenger-status requires root.
 
