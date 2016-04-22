@@ -2,11 +2,11 @@ package main
 
 import (
 	"bytes"
-	"code.google.com/p/go-charset/charset"
-	_ "code.google.com/p/go-charset/data"
 	"encoding/xml"
 	"fmt"
 	"github.com/PagerDuty/godspeed"
+	"github.com/paulrosania/go-charset/charset"
+	_ "github.com/paulrosania/go-charset/data"
 	"io"
 	"log"
 	"os"
@@ -22,7 +22,7 @@ type passengerStatus struct {
 	ProcessCount int       `xml:"process_count"`
 	PoolMax      int       `xml:"max"`
 	PoolCurrent  int       `xml:"capacity_used"`
-	QueuedCount  []int       `xml:"supergroups>supergroup>group>get_wait_list_size"`
+	QueuedCount  []int     `xml:"supergroups>supergroup>group>get_wait_list_size"`
 	Processes    []process `xml:"supergroups>supergroup>group>processes>process"`
 }
 
@@ -33,7 +33,6 @@ type process struct {
 	CPU             int `xml:"cpu"`
 	Memory          int `xml:"real_memory"`
 }
-
 
 //Stats is used to store stats
 type Stats struct {
@@ -81,8 +80,8 @@ func parsePassengerXML(xmlData *io.Reader) (passengerStatus, error) {
 	return ParsedPassengerXML, nil
 }
 
-func floatMyInt(value int) float64{
-    return float64(value)
+func floatMyInt(value int) float64 {
+	return float64(value)
 }
 
 func processed(passengerDetails *passengerStatus) Stats {
@@ -114,15 +113,15 @@ func processUptime(passengerDetails *passengerStatus) Stats {
 }
 
 func chartPendingRequest(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
-    var totalQueued int
-    for _,queued := range passengerDetails.QueuedCount {
-        totalQueued += queued
-    }
-    if print {
+	var totalQueued int
+	for _, queued := range passengerDetails.QueuedCount {
+		totalQueued += queued
+	}
+	if print {
 		fmt.Println("|=====Queue Depth====|")
 		fmt.Println("Queue Depth", totalQueued)
 	}
-    DogStatsD.Gauge("passenger.queue.depth", floatMyInt(totalQueued),nil)
+	DogStatsD.Gauge("passenger.queue.depth", floatMyInt(totalQueued), nil)
 }
 func chartPoolUse(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
 	if print {
@@ -130,8 +129,8 @@ func chartPoolUse(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspee
 		fmt.Println("Used Pool", passengerDetails.ProcessCount)
 		fmt.Println("Max Pool", passengerDetails.PoolMax)
 	}
-        DogStatsD.Gauge("passenger.pool.used", floatMyInt(passengerDetails.ProcessCount),nil)
-        DogStatsD.Gauge("passenger.pool.max", floatMyInt(passengerDetails.PoolMax),nil)
+	DogStatsD.Gauge("passenger.pool.used", floatMyInt(passengerDetails.ProcessCount), nil)
+	DogStatsD.Gauge("passenger.pool.max", floatMyInt(passengerDetails.PoolMax), nil)
 }
 func chartProcessed(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
 	stats := processed(passengerDetails)
@@ -142,10 +141,10 @@ func chartProcessed(passengerDetails *passengerStatus, DogStatsD *godspeed.Godsp
 		fmt.Println("Minimum processed", stats.min)
 		fmt.Println("Maximum processed", stats.max)
 	}
-    DogStatsD.Gauge("passenger.processed.total",floatMyInt(stats.sum),nil)
-    DogStatsD.Gauge("passenger.processed.avg",floatMyInt(stats.avg),nil)
-    DogStatsD.Gauge("passenger.processed.min",floatMyInt(stats.min),nil)
-    DogStatsD.Gauge("passenger.processed.max",floatMyInt(stats.max),nil)
+	DogStatsD.Gauge("passenger.processed.total", floatMyInt(stats.sum), nil)
+	DogStatsD.Gauge("passenger.processed.avg", floatMyInt(stats.avg), nil)
+	DogStatsD.Gauge("passenger.processed.min", floatMyInt(stats.min), nil)
+	DogStatsD.Gauge("passenger.processed.max", floatMyInt(stats.max), nil)
 
 }
 func chartMemory(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
@@ -157,10 +156,10 @@ func chartMemory(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed
 		fmt.Println("Minimum memory", stats.min/1024)
 		fmt.Println("Maximum memory", stats.max/1024)
 	}
-    DogStatsD.Gauge("passenger.memory.total",floatMyInt(stats.sum/1024),nil)
-    DogStatsD.Gauge("passenger.memory.avg",floatMyInt(stats.avg/1024),nil)
-    DogStatsD.Gauge("passenger.memory.min",floatMyInt(stats.min/1024),nil)
-    DogStatsD.Gauge("passenger.memory.max",floatMyInt(stats.max/1024),nil)
+	DogStatsD.Gauge("passenger.memory.total", floatMyInt(stats.sum/1024), nil)
+	DogStatsD.Gauge("passenger.memory.avg", floatMyInt(stats.avg/1024), nil)
+	DogStatsD.Gauge("passenger.memory.min", floatMyInt(stats.min/1024), nil)
+	DogStatsD.Gauge("passenger.memory.max", floatMyInt(stats.max/1024), nil)
 }
 func chartProcessUptime(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
 	stats := processUptime(passengerDetails)
@@ -170,9 +169,9 @@ func chartProcessUptime(passengerDetails *passengerStatus, DogStatsD *godspeed.G
 		fmt.Println("Minimum uptime", stats.min, "min")
 		fmt.Println("Maximum uptime", stats.max, "min")
 	}
-    DogStatsD.Gauge("passenger.uptime.avg",floatMyInt(stats.avg),nil)
-    DogStatsD.Gauge("passenger.uptime.min",floatMyInt(stats.min),nil)
-    DogStatsD.Gauge("passenger.uptime.max",floatMyInt(stats.max),nil)
+	DogStatsD.Gauge("passenger.uptime.avg", floatMyInt(stats.avg), nil)
+	DogStatsD.Gauge("passenger.uptime.min", floatMyInt(stats.min), nil)
+	DogStatsD.Gauge("passenger.uptime.max", floatMyInt(stats.max), nil)
 }
 
 func main() {
@@ -181,29 +180,29 @@ func main() {
 			print = true
 		}
 	}
-    for {
-        xmlData, err := retrievePassengerStats()
-        if err != nil {
-            log.Fatal("Error getting passenger data:", err)
-        }
-        PassengerStatusData, err := parsePassengerXML(&xmlData)
-        if err != nil {
-            log.Fatal("Error parsing passenger data:", err)
-        }
-        if PassengerStatusData.ProcessCount == 0 {
-            log.Println("Passenger has not yet started any threads, will try again next loop")
-        } else {
-        DogStatsD, err := godspeed.NewDefault()
-        if err != nil {
-            log.Fatal("Error establishing StatsD connection", err)
-        }
-        chartProcessed(&PassengerStatusData, DogStatsD)
-        chartMemory(&PassengerStatusData, DogStatsD)
-        chartPendingRequest(&PassengerStatusData, DogStatsD)
-        chartPoolUse(&PassengerStatusData, DogStatsD)
-        chartProcessUptime(&PassengerStatusData, DogStatsD)
-        DogStatsD.Conn.Close()
-        }
-        time.Sleep(10 * time.Second)
-    }
+	for {
+		xmlData, err := retrievePassengerStats()
+		if err != nil {
+			log.Fatal("Error getting passenger data:", err)
+		}
+		PassengerStatusData, err := parsePassengerXML(&xmlData)
+		if err != nil {
+			log.Fatal("Error parsing passenger data:", err)
+		}
+		if PassengerStatusData.ProcessCount == 0 {
+			log.Println("Passenger has not yet started any threads, will try again next loop")
+		} else {
+			DogStatsD, err := godspeed.NewDefault()
+			if err != nil {
+				log.Fatal("Error establishing StatsD connection", err)
+			}
+			chartProcessed(&PassengerStatusData, DogStatsD)
+			chartMemory(&PassengerStatusData, DogStatsD)
+			chartPendingRequest(&PassengerStatusData, DogStatsD)
+			chartPoolUse(&PassengerStatusData, DogStatsD)
+			chartProcessUptime(&PassengerStatusData, DogStatsD)
+			DogStatsD.Conn.Close()
+		}
+		time.Sleep(10 * time.Second)
+	}
 }
