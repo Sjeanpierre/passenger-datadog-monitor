@@ -13,7 +13,7 @@ Graph and track Passenger threads and possibly detect misbehaving threads before
 
 ## Installation
 ### Building the binary
-You will first need to build the `passenger-datadog-monitor` executable using [Go](https://golang.org). Download the source and dependencies, then build the binary running:
+You will first need to build the `passenger-datadog-monitor` executable using [Go](https://golang.org). You can download the source and dependencies, and build the binary by running:
 ```
 go get -v github.com/Sjeanpierre/passenger-datadog-monitor
 ```
@@ -35,8 +35,8 @@ start program = "/etc/init.d/passenger-datadog-monitor start"
 stop  program = "/etc/init.d/passenger-datadog-monitor stop"
 ```
 
-`./passenger-datadog-monitor` as root, since access to passenger-status requires root.
+You should run `passenger-datadog-monitor` as root, since access to passenger-status requires root.
 
-`./passenger-datadog-monitor print` for basic console output of stats, useful for debugging
+Running `passenger-datadog-monitor print` will output stats and is useful for debugging.
 
 [udp.rb](https://github.com/Sjeanpierre/passenger-datadog-monitor/blob/master/server/udp.rb) can be run locally when you want to see what is being received on the server side.
