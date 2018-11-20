@@ -32,6 +32,7 @@ type process struct {
 	SpawnTime       int `xml:"spawn_end_time"`
 	CPU             int `xml:"cpu"`
 	Memory          int `xml:"real_memory"`
+	LastUsedTime    int `xml:"last_used"`
 }
 
 //Stats is used to store stats
@@ -111,6 +112,18 @@ func processUptime(passengerDetails *passengerStatus) Stats {
 	}
 	return summerizeStats(&upTimes)
 }
+func processUse(passengerDetails *passengerStatus) int {
+	var totalUsed int
+	processes := passengerDetails.Processes
+	periodStart := time.Now().Add(-(10 * time.Second))
+	for _, processStats := range processes {
+		lastUsedNano := time.Unix(0, int64(processStats.LastUsedTime*1000))
+		if lastUsedNano.After(periodStart) {
+			totalUsed += 1
+		}
+	}
+	return totalUsed
+}
 
 func chartPendingRequest(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
 	var totalQueued int
@@ -173,6 +186,14 @@ func chartProcessUptime(passengerDetails *passengerStatus, DogStatsD *godspeed.G
 	DogStatsD.Gauge("passenger.uptime.min", floatMyInt(stats.min), nil)
 	DogStatsD.Gauge("passenger.uptime.max", floatMyInt(stats.max), nil)
 }
+func chartProcessUse(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
+	totalUsed := processUse(passengerDetails)
+	if print {
+		fmt.Println("|=====Process Usage====|")
+		fmt.Println("Used Processes", totalUsed)
+	}
+	DogStatsD.Gauge("passenger.processes.used", floatMyInt(totalUsed), nil)
+}
 
 func main() {
 	if len(os.Args[1:]) > 0 {
@@ -201,6 +222,7 @@ func main() {
 			chartPendingRequest(&PassengerStatusData, DogStatsD)
 			chartPoolUse(&PassengerStatusData, DogStatsD)
 			chartProcessUptime(&PassengerStatusData, DogStatsD)
+			chartProcessUse(&PassengerStatusData, DogStatsD)
 			DogStatsD.Conn.Close()
 		}
 		time.Sleep(10 * time.Second)
