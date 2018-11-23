@@ -16,6 +16,7 @@ import (
 )
 
 var print bool
+var ddHost string = "localhost"
 
 type passengerStatus struct {
 	XMLName      xml.Name  `xml:"info"`
@@ -179,6 +180,9 @@ func main() {
 		if os.Args[1] == "print" {
 			print = true
 		}
+		if os.Args[1] == "host" {
+			ddHost = os.Args[2]
+		}
 	}
 	for {
 		xmlData, err := retrievePassengerStats()
@@ -192,7 +196,8 @@ func main() {
 		if PassengerStatusData.ProcessCount == 0 {
 			log.Println("Passenger has not yet started any threads, will try again next loop")
 		} else {
-			DogStatsD, err := godspeed.NewDefault()
+                        log.Println("Sending to host:", ddHost, ", port:", godspeed.DefaultPort)
+			DogStatsD, err := godspeed.New(ddHost, godspeed.DefaultPort, false)
 			if err != nil {
 				log.Fatal("Error establishing StatsD connection", err)
 			}

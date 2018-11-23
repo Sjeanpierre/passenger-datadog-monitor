@@ -39,4 +39,6 @@ You should run `passenger-datadog-monitor` as root, since access to passenger-st
 
 Running `passenger-datadog-monitor print` will output stats and is useful for debugging.
 
+Running with `passenger-datadog-monitor host mystatsdhost` will send stats to `mystatsdhost` instead of `localhost`.
+
 [udp.rb](https://github.com/Sjeanpierre/passenger-datadog-monitor/blob/master/server/udp.rb) can be run locally when you want to see what is being received on the server side.
