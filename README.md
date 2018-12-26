@@ -10,7 +10,7 @@ Graph and track Passenger threads and possibly detect misbehaving threads before
 * Memory usage: min,max,average,total
 * Thread uptime: min, max, average
 * Request queue depth
-* Threads in use *vs* Max thread configured
+* Threads in use *vs* Max thread configured & Threads used between runs
 #### Discrete
 - Process memory usage per Passenger Process PID
 - OS thread count per Passenger Process PID
