@@ -235,7 +235,7 @@ func processPerThreadRequests(passengerDetails *passengerStatus) map[int]float64
 	var processPerThreadProcessed = make(map[int]float64)
 	p := passengerDetails.Processes
 	for _, processedReq := range p {
-		processPerThreadProcessed[processedReq.PID]=floatMyInt(processedReq.Processed)
+		processPerThreadProcessed[processedReq.PID] = floatMyInt(processedReq.Processed)
 	}
 	return processPerThreadProcessed
 }
@@ -245,31 +245,47 @@ func chartDiscreteMetrics(passengerDetails *passengerStatus, DogStatsD *godspeed
 	threadMemoryUsages := processPerThreadMemoryUsage(passengerDetails)
 	threadIdletimes := processPerThreadIdleTime(passengerDetails)
 	threadProcessedCounts := processPerThreadRequests(passengerDetails)
-	if printOutput {fmt.Println("|====Process Thread Counts====|")}
+	if printOutput {
+		fmt.Println("|====Process Thread Counts====|")
+	}
 	for pid, count := range threadCountPerProcess {
-		if printOutput{fmt.Printf("PID: %d  Running: %0.2f threads\n",pid,count)}
-		tag := fmt.Sprintf("pid:%d",pid)
+		if printOutput {
+			fmt.Printf("PID: %d  Running: %0.2f threads\n", pid, count)
+		}
+		tag := fmt.Sprintf("pid:%d", pid)
 		_ = DogStatsD.Gauge("passenger.process.threads", count, []string{tag})
 	}
 
-	if printOutput {fmt.Println("|====Process Memory Usage====|")}
+	if printOutput {
+		fmt.Println("|====Process Memory Usage====|")
+	}
 	for pid, memUse := range threadMemoryUsages {
-		if printOutput{fmt.Printf("PID: %d Memory_Used: %0.2f MB\n",pid,memUse)}
-		tag := fmt.Sprintf("pid:%d",pid)
+		if printOutput {
+			fmt.Printf("PID: %d Memory_Used: %0.2f MB\n", pid, memUse)
+		}
+		tag := fmt.Sprintf("pid:%d", pid)
 		_ = DogStatsD.Gauge("passenger.process.memory", memUse, []string{tag})
 	}
 
-	if printOutput {fmt.Println("|====Process Idle Times====|")}
+	if printOutput {
+		fmt.Println("|====Process Idle Times====|")
+	}
 	for pid, seconds := range threadIdletimes {
-		if printOutput{fmt.Printf("PID: %d Idle: %d Seconds\n",pid,int(seconds))}
-		tag := fmt.Sprintf("pid:%d",pid)
+		if printOutput {
+			fmt.Printf("PID: %d Idle: %d Seconds\n", pid, int(seconds))
+		}
+		tag := fmt.Sprintf("pid:%d", pid)
 		_ = DogStatsD.Gauge("passenger.process.last_used", seconds, []string{tag})
 	}
 
-	if printOutput {fmt.Println("|====Process Requests Handled====|")}
+	if printOutput {
+		fmt.Println("|====Process Requests Handled====|")
+	}
 	for pid, count := range threadProcessedCounts {
-		if printOutput{fmt.Printf("PID: %d Processed: %d Requests\n",pid,int(count))}
-		tag := fmt.Sprintf("pid:%d",pid)
+		if printOutput {
+			fmt.Printf("PID: %d Processed: %d Requests\n", pid, int(count))
+		}
+		tag := fmt.Sprintf("pid:%d", pid)
 		_ = DogStatsD.Gauge("passenger.process.request_processed", count, []string{tag})
 	}
 }
@@ -301,7 +317,7 @@ func main() {
 			chartPendingRequest(&PassengerStatusData, DogStatsD)
 			chartPoolUse(&PassengerStatusData, DogStatsD)
 			chartProcessUptime(&PassengerStatusData, DogStatsD)
-			chartDiscreteMetrics(&PassengerStatusData,DogStatsD)
+			chartDiscreteMetrics(&PassengerStatusData, DogStatsD)
 			DogStatsD.Conn.Close()
 		}
 		time.Sleep(10 * time.Second)
