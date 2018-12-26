@@ -5,13 +5,21 @@ Send health metrics from Phusion Passenger to DataDog using the StatsD interface
 Graph and track Passenger threads and possibly detect misbehaving threads before they become a problem.
 
 ## Tracked Metrics
+#### Aggregated
 * Processed requests: min,max,average,total
 * Memory usage: min,max,average,total
 * Thread uptime: min, max, average
 * Request queue depth
 * Threads in use *vs* Max thread configured
+#### Discrete
+- Process memory usage per Passenger Process PID
+- OS thread count per Passenger Process PID
+- Requests processed per Passenger Process PID
+- Process Idle time per Passenger Process PID
 
 ## Installation
+### Downloading from Github
+The `passenger-datadog-monitor` binary can be downloaded from the [releases area](https://github.com/Sjeanpierre/passenger-datadog-monitor/releases) of this repository for Linux
 ### Building the binary
 You will first need to build the `passenger-datadog-monitor` executable using [Go](https://golang.org). You can download the source and dependencies, and build the binary by running:
 ```
@@ -21,6 +29,7 @@ Once it completes, you should find your new `passenger-datadog-monitor` executab
 
 Note that if you are building in a different environment from where you plan to deploy, you should configure your [target operating system and architecture](https://golang.org/doc/install/source#environment).
 
+The [Makefile](Makefile) in this repository will cross compile for Linux.
 ### Installing the binary
 After you've built the executable, you should install it on your server (e.g. in `/usr/bin/`).
 
