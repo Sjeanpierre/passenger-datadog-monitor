@@ -137,6 +137,19 @@ func processUptime(passengerDetails *passengerStatus) Stats {
 	return summarizeStats(&upTimes)
 }
 
+func processUse(passengerDetails *passengerStatus) int {
+	var totalUsed int
+	processes := passengerDetails.Processes
+	periodStart := time.Now().Add(-(10 * time.Second))
+	for _, processStats := range processes {
+		lastUsedNano := time.Unix(0, int64(processStats.LastUsed*1000))
+		if lastUsedNano.After(periodStart) {
+			totalUsed += 1
+		}
+	}
+	return totalUsed
+}
+
 func chartPendingRequest(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
 	var totalQueued int
 	for _, queued := range passengerDetails.QueuedCount {
@@ -190,6 +203,14 @@ func chartProcessUptime(passengerDetails *passengerStatus, DogStatsD *godspeed.G
 	_ = DogStatsD.Gauge("passenger.uptime.avg", floatMyInt(stats.avg), nil)
 	_ = DogStatsD.Gauge("passenger.uptime.min", floatMyInt(stats.min), nil)
 	_ = DogStatsD.Gauge("passenger.uptime.max", floatMyInt(stats.max), nil)
+}
+
+func chartProcessUse(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
+	totalUsed := processUse(passengerDetails)
+	if printOutput {
+		fmt.Printf("\n|=====Process Usage====|\nUsed Processes %d", totalUsed)
+	}
+	_ = DogStatsD.Gauge("passenger.processes.used", floatMyInt(totalUsed), nil)
 }
 
 //go through each process in the tree and get the per process thread count and per process last used time
@@ -317,8 +338,9 @@ func main() {
 			chartPendingRequest(&PassengerStatusData, DogStatsD)
 			chartPoolUse(&PassengerStatusData, DogStatsD)
 			chartProcessUptime(&PassengerStatusData, DogStatsD)
+			chartProcessUse(&PassengerStatusData, DogStatsD)
 			chartDiscreteMetrics(&PassengerStatusData, DogStatsD)
-			DogStatsD.Conn.Close()
+			_ = DogStatsD.Conn.Close()
 		}
 		time.Sleep(10 * time.Second)
 	}
