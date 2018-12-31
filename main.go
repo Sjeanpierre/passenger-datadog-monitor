@@ -267,7 +267,7 @@ func chartDiscreteMetrics(passengerDetails *passengerStatus, DogStatsD *godspeed
 	threadIdletimes := processPerThreadIdleTime(passengerDetails)
 	threadProcessedCounts := processPerThreadRequests(passengerDetails)
 	if printOutput {
-		fmt.Println("|====Process Thread Counts====|")
+		fmt.Println("\n|====Process Thread Counts====|")
 	}
 	for pid, count := range threadCountPerProcess {
 		if printOutput {
