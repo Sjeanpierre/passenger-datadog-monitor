@@ -2,19 +2,31 @@ package main
 
 import (
 	"bytes"
-	"code.google.com/p/go-charset/charset"
-	_ "code.google.com/p/go-charset/data"
 	"encoding/xml"
+	"flag"
 	"fmt"
-	"github.com/PagerDuty/godspeed"
 	"io"
 	"log"
-	"os"
 	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/theckman/godspeed"
+	"golang.org/x/net/html/charset"
+)
+
+const (
+	// DefaultHost is 127.0.0.1 (localhost)
+	DefaultHost = godspeed.DefaultHost
+
+	// DefaultPort is 8125
+	DefaultPort = godspeed.DefaultPort
+
+	// DefaultAutoTruncate If your metric is longer than MaxBytes autoTruncate can
+	// be used to truncate the message instead of erroring
+	DefaultAutoTruncate = false
 )
 
 var printOutput bool
@@ -71,13 +83,14 @@ func retrievePassengerStats() (io.Reader, error) {
 		fmt.Println(err)
 		return nil, err
 	}
+
 	return bytes.NewReader(out), nil
 }
 
 func parsePassengerXML(xmlData *io.Reader) (passengerStatus, error) {
 	var ParsedPassengerXML passengerStatus
 	dec := xml.NewDecoder(*xmlData)
-	dec.CharsetReader = charset.NewReader
+	dec.CharsetReader = charset.NewReaderLabel
 	err := dec.Decode(&ParsedPassengerXML)
 	if err != nil {
 		return passengerStatus{}, err
@@ -90,7 +103,7 @@ func floatMyInt(value int) float64 {
 }
 
 func getProcessThreadCount(pid int) (int, error) {
-	//ps -o nlwp --no-heading to get number of lightweight peoceses for given pid
+	//ps -o nlwp --no-heading to get number of lightweight processes for given pid
 	out, err := exec.Command("ps", "--no-header", "-o", "nlwp", strconv.Itoa(pid)).Output()
 	if err != nil {
 		return 0, fmt.Errorf("encountered error issuing command to retrieve"+
@@ -99,7 +112,7 @@ func getProcessThreadCount(pid int) (int, error) {
 	countString := strings.TrimSpace(string(out))
 	count, err := strconv.Atoi(countString)
 	if err != nil {
-		return 0, fmt.Errorf("encountered error parsing thread count from command return value, erro: %s", err)
+		return 0, fmt.Errorf("encountered error parsing thread count from command return value, err: %s", err)
 	}
 	return count, nil
 }
@@ -126,7 +139,6 @@ func memory(passengerDetails *passengerStatus) Stats {
 // Golang unix time function only accepts seconds or nano (1/1,000,000,000) seconds
 // multiplying by 1000 to get nano from micro
 func processUptime(passengerDetails *passengerStatus) Stats {
-
 	var upTimes []int
 	processes := passengerDetails.Processes
 	for _, processStats := range processes {
@@ -144,7 +156,7 @@ func processUse(passengerDetails *passengerStatus) int {
 	for _, processStats := range processes {
 		lastUsedNano := time.Unix(0, int64(processStats.LastUsed*1000))
 		if lastUsedNano.After(periodStart) {
-			totalUsed += 1
+			totalUsed++
 		}
 	}
 	return totalUsed
@@ -172,14 +184,13 @@ func chartPoolUse(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspee
 func chartProcessed(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
 	stats := processed(passengerDetails)
 	if printOutput {
-		fmt.Printf("\n|=====Processed====|\n Total processsed %d\n Average processed %d\n"+
+		fmt.Printf("\n|=====Processed====|\n Total processed %d\n Average processed %d\n"+
 			" Minimum processed %d\n Maximum processed %d", stats.sum, stats.avg, stats.min, stats.max)
 	}
 	_ = DogStatsD.Gauge("passenger.processed.total", floatMyInt(stats.sum), nil)
 	_ = DogStatsD.Gauge("passenger.processed.avg", floatMyInt(stats.avg), nil)
 	_ = DogStatsD.Gauge("passenger.processed.min", floatMyInt(stats.min), nil)
 	_ = DogStatsD.Gauge("passenger.processed.max", floatMyInt(stats.max), nil)
-
 }
 
 func chartMemory(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
@@ -266,6 +277,7 @@ func chartDiscreteMetrics(passengerDetails *passengerStatus, DogStatsD *godspeed
 	threadMemoryUsages := processPerThreadMemoryUsage(passengerDetails)
 	threadIdletimes := processPerThreadIdleTime(passengerDetails)
 	threadProcessedCounts := processPerThreadRequests(passengerDetails)
+
 	if printOutput {
 		fmt.Println("\n|====Process Thread Counts====|")
 	}
@@ -312,27 +324,41 @@ func chartDiscreteMetrics(passengerDetails *passengerStatus, DogStatsD *godspeed
 }
 
 func main() {
-	if len(os.Args[1:]) > 0 {
-		if os.Args[1] == "print" {
-			printOutput = true
-		}
+	//get host and port
+	hostName := flag.String("host", DefaultHost, "DogStatsD Host")
+	portNum := flag.Int("port", DefaultPort, "DogStatsD UDP Port")
+	flag.BoolVar(&printOutput, "print", false, "Print Outputs")
+
+	flag.Parse()
+
+	//backwards compatibility
+	if flag.NArg() > 0 && flag.Arg(0) == "print" {
+		printOutput = true
 	}
+
+	if printOutput {
+		log.Println("Starting loop, sending to", *hostName, *portNum)
+	}
+
 	for {
 		xmlData, err := retrievePassengerStats()
 		if err != nil {
 			log.Fatal("Error getting passenger data:", err)
 		}
+
 		PassengerStatusData, err := parsePassengerXML(&xmlData)
 		if err != nil {
 			log.Fatal("Error parsing passenger data:", err)
 		}
+
 		if PassengerStatusData.ProcessCount == 0 {
 			log.Println("Passenger has not yet started any threads, will try again next loop")
 		} else {
-			DogStatsD, err := godspeed.NewDefault()
+			DogStatsD, err := godspeed.New(*hostName, *portNum, DefaultAutoTruncate)
 			if err != nil {
 				log.Fatal("Error establishing StatsD connection", err)
 			}
+
 			chartProcessed(&PassengerStatusData, DogStatsD)
 			chartMemory(&PassengerStatusData, DogStatsD)
 			chartPendingRequest(&PassengerStatusData, DogStatsD)
@@ -340,8 +366,10 @@ func main() {
 			chartProcessUptime(&PassengerStatusData, DogStatsD)
 			chartProcessUse(&PassengerStatusData, DogStatsD)
 			chartDiscreteMetrics(&PassengerStatusData, DogStatsD)
-			_ = DogStatsD.Conn.Close()
+
+			DogStatsD.Conn.Close()
 		}
+
 		time.Sleep(10 * time.Second)
 	}
 }
