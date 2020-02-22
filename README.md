@@ -1,6 +1,6 @@
 # passenger-datadog-monitor
 
-Send health metrics from Phusion Passenger to DataDog using the StatsD interface on the server agent.
+Send health metrics from Phusion Passenger to Datadog using the StatsD interface on the server agent.
 
 ## Purpose
 
