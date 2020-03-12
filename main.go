@@ -19,6 +19,7 @@ import (
 
 const (
 	// DefaultHost is 127.0.0.1 (localhost)
+	// DefaultHost is second line
 	DefaultHost = godspeed.DefaultHost
 
 	// DefaultPort is 8125
