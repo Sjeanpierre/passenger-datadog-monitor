@@ -1,5 +1,7 @@
 module github.com/sjeanpierre/passenger-datadog-monitor
 
+go 1.16
+
 require (
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/theckman/godspeed v1.1.0
