@@ -50,7 +50,7 @@ type process struct {
 	LastUsed        int64 `xml:"last_used"`
 }
 
-//Stats is used to store stats
+// Stats is used to store stats
 type Stats struct {
 	min int
 	len int
@@ -162,6 +162,19 @@ func processUse(passengerDetails *passengerStatus) int {
 	return totalUsed
 }
 
+func sessionUse(passengerDetails *passengerStatus) int {
+	var totalUsed int
+	processes := passengerDetails.Processes
+	periodStart := time.Now().Add(-(10 * time.Second))
+	for _, processStats := range processes {
+		lastUsedNano := time.Unix(0, int64(processStats.LastUsed*1000))
+		if lastUsedNano.After(periodStart) {
+			totalUsed += processStats.CurrentSessions
+		}
+	}
+	return totalUsed
+}
+
 func chartPendingRequest(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
 	var totalQueued int
 	for _, queued := range passengerDetails.QueuedCount {
@@ -224,7 +237,15 @@ func chartProcessUse(passengerDetails *passengerStatus, DogStatsD *godspeed.Gods
 	_ = DogStatsD.Gauge("passenger.processes.used", floatMyInt(totalUsed), nil)
 }
 
-//go through each process in the tree and get the per process thread count and per process last used time
+func chartSessionUse(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
+	totalUsed := sessionUse(passengerDetails)
+	if printOutput {
+		fmt.Printf("\n|=====Session Usage====|\nUsed Sessions %d", totalUsed)
+	}
+	_ = DogStatsD.Gauge("passenger.sessions.total", floatMyInt(totalUsed), nil)
+}
+
+// go through each process in the tree and get the per process thread count and per process last used time
 func processSystemThreadUsage(passengerDetails *passengerStatus) map[int]float64 {
 	var processThreads = make(map[int]float64)
 	p := passengerDetails.Processes
@@ -238,6 +259,17 @@ func processSystemThreadUsage(passengerDetails *passengerStatus) map[int]float64
 		processThreads[processDetails.PID] = floatMyInt(tc)
 	}
 	return processThreads
+}
+
+// go through each process in the tree and get the number of sessions per process
+func processSystemSessionUsage(passengerDetails *passengerStatus) map[int]float64 {
+	var processSessions = make(map[int]float64)
+	p := passengerDetails.Processes
+	for _, processDetails := range p {
+		sc := processDetails.CurrentSessions
+		processSessions[processDetails.PID] = floatMyInt(sc)
+	}
+	return processSessions
 }
 
 func processPerThreadMemoryUsage(passengerDetails *passengerStatus) map[int]float64 {
@@ -274,6 +306,7 @@ func processPerThreadRequests(passengerDetails *passengerStatus) map[int]float64
 
 func chartDiscreteMetrics(passengerDetails *passengerStatus, DogStatsD *godspeed.Godspeed) {
 	threadCountPerProcess := processSystemThreadUsage(passengerDetails)
+	sessionCountPerProcess := processSystemSessionUsage(passengerDetails)
 	threadMemoryUsages := processPerThreadMemoryUsage(passengerDetails)
 	threadIdletimes := processPerThreadIdleTime(passengerDetails)
 	threadProcessedCounts := processPerThreadRequests(passengerDetails)
@@ -287,6 +320,17 @@ func chartDiscreteMetrics(passengerDetails *passengerStatus, DogStatsD *godspeed
 		}
 		tag := fmt.Sprintf("pid:%d", pid)
 		_ = DogStatsD.Gauge("passenger.process.threads", count, []string{tag})
+	}
+
+	if printOutput {
+		fmt.Println("\n|====Process Session Counts====|")
+	}
+	for pid, count := range sessionCountPerProcess {
+		if printOutput {
+			fmt.Printf("PID: %d  Current Sessions: %0.2f\n", pid, count)
+		}
+		tag := fmt.Sprintf("pid:%d", pid)
+		_ = DogStatsD.Gauge("passenger.process.sessions", count, []string{tag})
 	}
 
 	if printOutput {
@@ -365,6 +409,7 @@ func main() {
 			chartPoolUse(&PassengerStatusData, DogStatsD)
 			chartProcessUptime(&PassengerStatusData, DogStatsD)
 			chartProcessUse(&PassengerStatusData, DogStatsD)
+			chartSessionUse(&PassengerStatusData, DogStatsD)
 			chartDiscreteMetrics(&PassengerStatusData, DogStatsD)
 
 			DogStatsD.Conn.Close()
